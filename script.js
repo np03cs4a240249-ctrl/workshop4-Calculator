@@ -1,55 +1,84 @@
-let currentInput = "";
-let firstNum = "";
-let operator = "";
-
+let expression = "";
 const display = document.getElementById("display");
 
-// 1. Update the display when numbers or operators are clicked
+function updateDisplay() {
+  display.value = expression || "0";
+}
+
 function appendToDisplay(value) {
-  if (["+", "-", "*", "/"].includes(value)) {
-    firstNum = currentInput;
-    operator = value;
-    currentInput = "";
-  } else {
-    currentInput += value;
+  const lastChar = expression[expression.length - 1];
+
+  // Prevent starting with invalid operators
+  if (expression === "" && ["+", "*", "/", "%"].includes(value)) {
+    return;
   }
-  display.value = currentInput || firstNum;
+
+  // Prevent two operators together
+  if (["+", "-", "*", "/", "%"].includes(lastChar) &&
+      ["+", "-", "*", "/", "%"].includes(value)) {
+    expression = expression.slice(0, -1) + value;
+    updateDisplay();
+    return;
+  }
+
+  // Prevent multiple dots in one number
+  if (value === ".") {
+    let parts = expression.split(/[\+\-\*\/%]/);
+    let currentPart = parts[parts.length - 1];
+    if (currentPart.includes(".")) {
+      return;
+    }
+  }
+
+  expression += value;
+  updateDisplay();
 }
 
-// 2. Clear everything
 function clearDisplay() {
-  currentInput = "";
-  firstNum = "";
-  operator = "";
-  display.value = "";
+  expression = "";
+  updateDisplay();
 }
 
-// 3. The "Magic" - Sending data to your Backend
-async function calculate() {
-  const secondNum = currentInput;
+function deleteLast() {
+  expression = expression.slice(0, -1);
+  updateDisplay();
+}
 
-  if (!firstNum || !secondNum || !operator) return;
+function calculate() {
+  if (expression === "") return;
 
   try {
-    // We fetch the result from your Node.js server running on port 5000
-    const response = await fetch("http://localhost:5000/calculate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        num1: firstNum,
-        num2: secondNum,
-        operator: operator,
-      }),
-    });
+    let result = eval(expression);
 
-    const data = await response.json();
+    // Handle invalid result
+    if (!isFinite(result)) {
+      display.value = "Error";
+      expression = "";
+      return;
+    }
 
-    // Show the result from the server
-    display.value = data.result;
-    currentInput = data.result; // Allow the user to keep calculating
-    firstNum = "";
+    expression = result.toString();
+    updateDisplay();
   } catch (error) {
     display.value = "Error";
-    console.error("Connection to Backend failed:", error);
+    expression = "";
   }
 }
+
+// Keyboard support
+document.addEventListener("keydown", function (e) {
+  const key = e.key;
+
+  if (!isNaN(key) || ["+", "-", "*", "/", "%", "."].includes(key)) {
+    appendToDisplay(key);
+  } else if (key === "Enter" || key === "=") {
+    calculate();
+  } else if (key === "Backspace") {
+    deleteLast();
+  } else if (key === "Escape") {
+    clearDisplay();
+  }
+});
+
+// Show 0 at start
+updateDisplay();
